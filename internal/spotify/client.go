@@ -19,6 +19,10 @@ func (c *Client) CurrentlyPlaying(ctx context.Context) (*spotify.CurrentlyPlayin
 	return c.client.PlayerCurrentlyPlaying(ctx)
 }
 
+func (c *Client) PlayerState(ctx context.Context) (*spotify.PlayerState, error) {
+	return c.client.PlayerState(ctx)
+}
+
 func (c *Client) Play(ctx context.Context) error {
 	return c.client.Play(ctx)
 }
@@ -86,6 +90,32 @@ func (c *Client) PlayTrackInContext(ctx context.Context, contextURI spotify.URI,
 	return c.client.PlayOpt(ctx, opts)
 }
 
+func (c *Client) PlayTrackFromURIList(ctx context.Context, uris []spotify.URI, offset int) error {
+	if len(uris) == 0 {
+		return nil
+	}
+
+	if offset >= len(uris) {
+		offset = 0
+	}
+
+	opts := &spotify.PlayOptions{
+		URIs:           uris,
+		PlaybackOffset: &spotify.PlaybackOffset{Position: &offset},
+	}
+	return c.client.PlayOpt(ctx, opts)
+}
+
+func (c *Client) PlayLikedSongs(ctx context.Context, userID string, offset int) error {
+	// Liked Songs collection URI: spotify:user:<user_id>:collection
+	collectionURI := spotify.URI("spotify:user:" + userID + ":collection")
+	opts := &spotify.PlayOptions{
+		PlaybackContext: &collectionURI,
+		PlaybackOffset:  &spotify.PlaybackOffset{Position: &offset},
+	}
+	return c.client.PlayOpt(ctx, opts)
+}
+
 func (c *Client) PlayTrackAlone(ctx context.Context, trackURI spotify.URI) error {
 	opts := &spotify.PlayOptions{
 		URIs: []spotify.URI{trackURI},
@@ -112,4 +142,8 @@ func (c *Client) Search(ctx context.Context, query string) ([]spotify.FullTrack,
 	}
 
 	return results.Tracks.Tracks, nil
+}
+
+func (c *Client) CurrentUser(ctx context.Context) (*spotify.PrivateUser, error) {
+	return c.client.CurrentUser(ctx)
 }

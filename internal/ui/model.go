@@ -32,29 +32,37 @@ type Model struct {
 	selectedIndex int
 
 	// Main Panel
-	tracks             []spotifysdk.PlaylistTrack
-	trackIndex         int
-	currentPlaylistURI spotifysdk.URI
-	searchMode         bool
-	searchQuery        string
-	searchResults      []spotifysdk.FullTrack
-	searchIndex        int
+	tracks              []spotifysdk.PlaylistTrack
+	trackList           list.Model
+	currentPlaylistURI  spotifysdk.URI
+	currentPlaylistName string
+	playingPlaylistName string
+	isLikedSongs        bool
+	loadingTracks       bool
+	searchMode          bool
+	searchQuery         string
+	searchResults       []spotifysdk.FullTrack
+	searchIndex         int
 
 	// Player State
-	currentTrack *spotifysdk.CurrentlyPlaying
-	isPlaying    bool
-	progress     time.Duration
-	duration     time.Duration
-	lastUpdate   time.Time
-	shuffle      bool
-	repeatState  string
+	currentTrack    *spotifysdk.PlayerState
+	playingTrackURI string
+	isPlaying       bool
+	progress        time.Duration
+	duration        time.Duration
+	lastUpdate      time.Time
+	shuffle         bool
+	repeatState     string
+
+	// User
+	user *spotifysdk.PrivateUser
 
 	// Error
 	err string
 }
 
 type tickMsg time.Time
-type playbackMsg *spotifysdk.CurrentlyPlaying
+type playbackMsg *spotifysdk.PlayerState
 type playlistsMsg []spotifysdk.SimplePlaylist
 type tracksMsg struct {
 	tracks      []spotifysdk.PlaylistTrack
@@ -62,23 +70,32 @@ type tracksMsg struct {
 }
 type savedTracksMsg []spotifysdk.SavedTrack
 type searchResultsMsg []spotifysdk.FullTrack
+type userMsg *spotifysdk.PrivateUser
 type errorMsg string
 
 func NewModel(ctx context.Context, client *spotify.Client) Model {
 	delegate := list.NewDefaultDelegate()
 	delegate.SetSpacing(0) // アイテム間のスペースを0に
 
-	l := list.New([]list.Item{}, delegate, 0, 0)
-	l.SetShowHelp(false)
-	l.SetFilteringEnabled(false)
-	l.SetShowStatusBar(false)
-	l.SetShowTitle(false)
+	playlistList := list.New([]list.Item{}, delegate, 0, 0)
+	playlistList.SetShowHelp(false)
+	playlistList.SetFilteringEnabled(false)
+	playlistList.SetShowStatusBar(false)
+	playlistList.SetShowTitle(false)
+
+	trackDelegate := NewTrackDelegate()
+	trackList := list.New([]list.Item{}, trackDelegate, 0, 0)
+	trackList.SetShowHelp(false)
+	trackList.SetFilteringEnabled(false)
+	trackList.SetShowStatusBar(false)
+	trackList.SetShowTitle(false)
 
 	return Model{
 		ctx:         ctx,
 		client:      client,
 		focus:       FocusSidebar,
-		playlists:   l,
+		playlists:   playlistList,
+		trackList:   trackList,
 		lastUpdate:  time.Now(),
 		repeatState: "off",
 	}
@@ -87,6 +104,7 @@ func NewModel(ctx context.Context, client *spotify.Client) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchPlaylists(),
+		m.fetchUser(),
 		tickCmd(),
 	)
 }
@@ -109,11 +127,11 @@ func (m Model) fetchPlaylists() tea.Cmd {
 
 func (m Model) fetchCurrentPlayback() tea.Cmd {
 	return func() tea.Msg {
-		playing, err := m.client.CurrentlyPlaying(m.ctx)
+		state, err := m.client.PlayerState(m.ctx)
 		if err != nil {
 			return errorMsg(err.Error())
 		}
-		return playbackMsg(playing)
+		return playbackMsg(state)
 	}
 }
 
@@ -142,15 +160,31 @@ func (m Model) fetchSavedTracks() tea.Cmd {
 	}
 }
 
+type playStartedMsg string
+
 func (m Model) playTrackInPlaylist(offset int) tea.Cmd {
+	playlistName := m.currentPlaylistName
 	return func() tea.Msg {
+		// Liked Songsの場合はURIリストで再生
+		if m.isLikedSongs {
+			uris := make([]spotifysdk.URI, len(m.tracks))
+			for i, track := range m.tracks {
+				uris[i] = track.Track.URI
+			}
+			if err := m.client.PlayTrackFromURIList(m.ctx, uris, offset); err != nil {
+				return errorMsg(err.Error())
+			}
+			return playStartedMsg(playlistName)
+		}
+
+		// 通常のプレイリストはコンテキストで再生
 		if m.currentPlaylistURI == "" {
 			return errorMsg("No playlist context")
 		}
 		if err := m.client.PlayTrackInContext(m.ctx, m.currentPlaylistURI, offset); err != nil {
 			return errorMsg(err.Error())
 		}
-		return nil
+		return playStartedMsg(playlistName)
 	}
 }
 
@@ -207,5 +241,15 @@ func (m Model) performSearch(query string) tea.Cmd {
 			return errorMsg(err.Error())
 		}
 		return searchResultsMsg(results)
+	}
+}
+
+func (m Model) fetchUser() tea.Cmd {
+	return func() tea.Msg {
+		user, err := m.client.CurrentUser(m.ctx)
+		if err != nil {
+			return errorMsg(err.Error())
+		}
+		return userMsg(user)
 	}
 }

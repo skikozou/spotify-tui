@@ -5,11 +5,15 @@ A Terminal User Interface (TUI) client for Spotify written in Go using Bubbletea
 ## Features
 
 - 🎵 Browse and play your playlists
+- 💚 Liked Songs support
+- 🔍 Track search functionality
 - ⏯️ Full playback control (Play/Pause, Next, Previous)
-- 🔀 Shuffle and repeat modes
+- 🔀 Shuffle and repeat modes (synced with Spotify)
 - 📊 Real-time progress bar with smooth updates
 - 🎨 Clean, Spotify-themed interface
 - ⌨️ Keyboard-driven navigation
+- 👤 User profile display
+- ♫ Now playing indicator with playlist/album name
 
 ## Requirements
 
@@ -56,7 +60,7 @@ On first run, you'll be prompted to enter your Client ID and Client Secret. Thes
 - `p` - Previous track
 - `s` - Toggle shuffle
 - `r` - Cycle repeat mode (off → context → track)
-- `/` - Search mode (UI only, not yet functional)
+- `/` - Search mode
 - `Tab` - Switch between sidebar and main panel
 
 #### Navigation
@@ -70,15 +74,17 @@ On first run, you'll be prompted to enter your Client ID and Client Secret. Thes
 ┌──────────┬─────────────────────────────────────────┐
 │          │                                         │
 │ LEFT     │           RIGHT PANEL                   │
-│ SIDEBAR  │     (Playlist details / Search)         │
+│ SIDEBAR  │           (Track list)                  │
 │ (30%)    │              (70%)                      │
+│          │  Song Title                             │
+│ Playlists│  Artist Name (gray)                    │
 │          │                                         │
-├──────────┴─────────────────────────────────────────┤
-│ NOW PLAYING BAR                                    │
-│ ♫ Track - Artist                                   │
-│ [████████░░] 2:34 / 4:12                          │
-│ 🔀 ▶ 🔁   [Space] Pause | [n] Next | [q] Quit    │
-└────────────────────────────────────────────────────┘
+├──────────┼─────────────────────────────────────────┤
+│ USER     │ NOW PLAYING BAR                         │
+│ Name     │ ♫ Track - Artist | Playlist Name        │
+│ Plan     │ [████████░░] 2:34 / 4:12               │
+│ Followers│ 🔀 ▶ 🔁   [Space] Pause | [n] Next     │
+└──────────┴─────────────────────────────────────────┘
 ```
 
 ## Architecture
@@ -98,7 +104,8 @@ spotify-tui/
 │   └── ui/
 │       ├── model.go          # Bubbletea model
 │       ├── update.go         # Update logic
-│       └── view.go           # View rendering
+│       ├── view.go           # View rendering
+│       └── delegate.go       # Custom list delegate
 ├── go.mod
 └── README.md
 ```
@@ -113,13 +120,11 @@ spotify-tui/
 ## Limitations
 
 - Requires Spotify Premium for playback control
-- Search functionality is not yet implemented (UI example only)
 - Device switching is not yet available
 - Volume control not yet implemented
 
 ## Future Enhancements
 
-- [ ] Full search implementation
 - [ ] Device selection
 - [ ] Volume control
 - [ ] Queue management

@@ -47,6 +47,10 @@ var (
 				Bold(true).
 				Background(highlightColor)
 
+	playingTrackStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#1DB954")).
+				Bold(true)
+
 	errorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF0000")).
 			Bold(true)
@@ -57,25 +61,24 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
-	// Calculate dimensions carefully
-	// Bottom player bar takes 5 lines (content) + 2 (border) = 7 total
-	playerBarHeight := 7
-
-	// Content area is remaining height - 1 for spacing
-	contentHeight := m.height - playerBarHeight - 1
-	if contentHeight < 5 {
-		contentHeight = 5
-	}
-
 	// Sidebar is 30% of width
 	sidebarWidth := (m.width * 3) / 10
 	mainWidth := m.width - sidebarWidth
 
-	// Render content (subtract border width: 2 for each side)
-	// And leave space for padding
-	sidebarContent := m.renderSidebar(sidebarWidth-3, contentHeight-2)
-	mainContent := m.renderMainPanel(mainWidth-3, contentHeight-2)
-	playerBarContent := m.renderPlayerBar(m.width - 4)
+	// Bottom bar: user info (5 lines) + border (2) = 7 total
+	bottomBarHeight := 8
+
+	// Content area is remaining height
+	contentHeight := m.height - bottomBarHeight
+	if contentHeight < 5 {
+		contentHeight = 5
+	}
+
+	// Render content (subtract border width: 2 for each panel)
+	sidebarContent := m.renderSidebar(sidebarWidth-2, contentHeight-2)
+	mainContent := m.renderMainPanel(mainWidth-2, contentHeight-2)
+	// Player bar width: mainWidth - border(2) - padding(2)
+	playerBarContent := m.renderPlayerBar(mainWidth - 4)
 
 	// Apply borders and styling
 	sidebarStyleFinal := sidebarStyle.
@@ -99,11 +102,24 @@ func (m Model) View() string {
 		mainPanelStyleFinal.Render(mainContent),
 	)
 
+	// Bottom bar: user info (left) + player bar (right)
+	userInfoContent := m.renderUserInfo(sidebarWidth - 4)
+
+	userInfoFinal := playerBarStyle.
+		Width(sidebarWidth - 2).
+		Render(userInfoContent)
+
 	playerBarFinal := playerBarStyle.
-		Width(m.width - 2).
+		Width(mainWidth - 2).
 		Render(playerBarContent)
 
-	return lipgloss.JoinVertical(lipgloss.Left, topRow, playerBarFinal)
+	bottomRow := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		userInfoFinal,
+		playerBarFinal,
+	)
+
+	return lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
 }
 
 func (m Model) renderSidebar(width, height int) string {
@@ -119,6 +135,14 @@ func (m Model) renderMainPanel(width, height int) string {
 		return m.renderSearchView(width, height)
 	}
 
+	if m.loadingTracks {
+		return lipgloss.Place(
+			width, height,
+			lipgloss.Center, lipgloss.Center,
+			"Loading tracks...",
+		)
+	}
+
 	if len(m.tracks) == 0 {
 		return lipgloss.Place(
 			width, height,
@@ -127,43 +151,10 @@ func (m Model) renderMainPanel(width, height int) string {
 		)
 	}
 
-	var lines []string
 	title := titleStyle.Render(" 📀 Tracks")
-	lines = append(lines, title, "")
+	content := m.trackList.View()
 
-	// Show visible tracks (with scrolling)
-	// タイトル(1行) + 空行(1行) = 2行使用
-	visibleLines := height - 2
-	if visibleLines < 1 {
-		visibleLines = 1
-	}
-
-	start := m.trackIndex
-	if start > len(m.tracks)-visibleLines {
-		start = len(m.tracks) - visibleLines
-	}
-	if start < 0 {
-		start = 0
-	}
-
-	for i := start; i < len(m.tracks) && i < start+visibleLines; i++ {
-		track := m.tracks[i]
-		line := fmt.Sprintf(" %2d. %s - %s",
-			i+1,
-			track.Track.Name,
-			track.Track.Artists[0].Name,
-		)
-
-		if i == m.trackIndex {
-			line = selectedTrackStyle.Render(" ▶" + line)
-		} else {
-			line = trackStyle.Render("  " + line)
-		}
-
-		lines = append(lines, line)
-	}
-
-	return strings.Join(lines, "\n")
+	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
 }
 
 func (m Model) renderSearchView(width, height int) string {
@@ -224,16 +215,70 @@ func (m Model) renderSearchView(width, height int) string {
 	return strings.Join(lines, "\n")
 }
 
+func (m Model) renderUserInfo(width int) string {
+	var lines []string
+
+	title := titleStyle.Render("👤 User")
+	lines = append(lines, title)
+
+	if m.user != nil {
+		lines = append(lines, fmt.Sprintf(" Name:      %s (%s)", m.user.DisplayName, m.user.ID))
+		if m.user.Product != "" {
+			lines = append(lines, fmt.Sprintf(" Plan:      %s", m.user.Product))
+		}
+		lines = append(lines, fmt.Sprintf(" Followers: %d", m.user.Followers.Count))
+	} else {
+		lines = append(lines, " Loading...")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func (m Model) renderPlayerBar(width int) string {
 	var lines []string
+
+	// Context info (playlist/album name)
+	contextInfo := ""
+	if m.currentTrack != nil && m.currentTrack.PlaybackContext.Type != "" {
+		switch m.currentTrack.PlaybackContext.Type {
+		case "playlist":
+			// 再生開始時のプレイリスト名を使用
+			if m.playingPlaylistName != "" {
+				contextInfo = m.playingPlaylistName
+			} else {
+				contextInfo = "Playlist"
+			}
+		case "album":
+			if m.currentTrack.Item != nil {
+				contextInfo = m.currentTrack.Item.Album.Name
+			}
+		case "artist":
+			contextInfo = "Artist"
+		case "collection":
+			contextInfo = "Liked Songs"
+		default:
+			contextInfo = string(m.currentTrack.PlaybackContext.Type)
+		}
+	} else if m.playingPlaylistName != "" {
+		// コンテキストがない場合でも再生中のプレイリスト名を表示
+		contextInfo = m.playingPlaylistName
+	}
 
 	// Track info
 	trackInfo := "No track playing"
 	if m.currentTrack != nil && m.currentTrack.Item != nil {
-		trackInfo = fmt.Sprintf("♫ %s - %s",
-			m.currentTrack.Item.Name,
-			m.currentTrack.Item.Artists[0].Name,
-		)
+		if contextInfo != "" {
+			trackInfo = fmt.Sprintf("♫ %s - %s | %s",
+				m.currentTrack.Item.Name,
+				m.currentTrack.Item.Artists[0].Name,
+				contextInfo,
+			)
+		} else {
+			trackInfo = fmt.Sprintf("♫ %s - %s",
+				m.currentTrack.Item.Name,
+				m.currentTrack.Item.Artists[0].Name,
+			)
+		}
 	}
 	lines = append(lines, trackInfo)
 

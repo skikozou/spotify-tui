@@ -114,6 +114,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.focus == FocusSidebar {
 				if item, ok := m.playlists.SelectedItem().(playlistItem); ok {
+					m.loadingTracks = true
+					m.currentPlaylistName = item.name
 					if item.id == "liked" {
 						cmd = m.fetchSavedTracks()
 					} else {
@@ -122,26 +124,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else if m.focus == FocusMain && len(m.tracks) > 0 {
 				// プレイリストのコンテキストで再生
-				cmd = m.playTrackInPlaylist(m.trackIndex)
+				if item, ok := m.trackList.SelectedItem().(trackItem); ok {
+					cmd = m.playTrackInPlaylist(item.index)
+				}
 			}
 
-		case "up", "k":
+		case "up", "k", "down", "j":
 			if m.focus == FocusSidebar {
 				m.playlists, cmd = m.playlists.Update(msg)
-			} else if m.focus == FocusMain && m.trackIndex > 0 {
-				m.trackIndex--
+			} else if m.focus == FocusMain {
+				m.trackList, cmd = m.trackList.Update(msg)
 			}
 
-		case "down", "j":
-			if m.focus == FocusSidebar {
-				m.playlists, cmd = m.playlists.Update(msg)
-			} else if m.focus == FocusMain && m.trackIndex < len(m.tracks)-1 {
-				m.trackIndex++
-			}
 		default:
 			// その他のキーはlistに渡す
 			if m.focus == FocusSidebar {
 				m.playlists, cmd = m.playlists.Update(msg)
+			} else if m.focus == FocusMain {
+				m.trackList, cmd = m.trackList.Update(msg)
 			}
 		}
 
@@ -152,12 +152,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// タイトル分(2行)と下部プレイヤー(7行)を引く
-		listHeight := msg.Height - 9 - 2
+		// 下部プレイヤー(7行)を引く
+		contentHeight := msg.Height - 7
+		// タイトル分(2行)を引く
+		listHeight := contentHeight - 2 - 2
 		if listHeight < 3 {
 			listHeight = 3
 		}
-		m.playlists.SetSize(msg.Width*3/10-4, listHeight)
+		sidebarWidth := msg.Width * 3 / 10
+		mainWidth := msg.Width - sidebarWidth
+		m.playlists.SetSize(sidebarWidth-4, listHeight)
+		m.trackList.SetSize(mainWidth-4, listHeight)
 
 	case tickMsg:
 		// シークバーをスムーズに更新
@@ -175,10 +180,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case playbackMsg:
 		if msg != nil && msg.Item != nil {
 			m.currentTrack = msg
+			newPlayingURI := string(msg.Item.URI)
+			// 再生中の曲が変わった場合、trackListのアイテムを更新
+			if newPlayingURI != m.playingTrackURI {
+				m.playingTrackURI = newPlayingURI
+				if len(m.trackList.Items()) > 0 {
+					selectedIdx := m.trackList.Index()
+					m.trackList.SetItems(m.updateTrackListItems(newPlayingURI))
+					m.trackList.Select(selectedIdx)
+				}
+			}
 			m.isPlaying = msg.Playing
 			m.progress = time.Duration(msg.Progress) * time.Millisecond
 			m.duration = time.Duration(msg.Item.Duration) * time.Millisecond
 			m.lastUpdate = time.Now()
+			m.shuffle = msg.ShuffleState
+			m.repeatState = msg.RepeatState
 		}
 
 	case playlistsMsg:
@@ -199,7 +216,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tracksMsg:
 		m.tracks = msg.tracks
 		m.currentPlaylistURI = msg.playlistURI
-		m.trackIndex = 0
+		m.isLikedSongs = false
+		m.loadingTracks = false
+		// trackListを更新
+		items := make([]list.Item, len(msg.tracks))
+		for i, t := range msg.tracks {
+			items[i] = trackItem{
+				index:  i,
+				name:   t.Track.Name,
+				artist: t.Track.Artists[0].Name,
+				uri:    string(t.Track.URI),
+			}
+		}
+		m.trackList.SetItems(items)
+		m.trackList.Select(0)
 
 	case savedTracksMsg:
 		// SavedTrackをPlaylistTrack形式に変換
@@ -210,12 +240,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.tracks = tracks
-		m.currentPlaylistURI = "spotify:user:tracks" // Liked SongsのコンテキストURI
-		m.trackIndex = 0
+		m.isLikedSongs = true
+		m.currentPlaylistURI = "" // URIは使用しない
+		m.loadingTracks = false
+		// trackListを更新
+		items := make([]list.Item, len(tracks))
+		for i, t := range tracks {
+			items[i] = trackItem{
+				index:  i,
+				name:   t.Track.Name,
+				artist: t.Track.Artists[0].Name,
+				uri:    string(t.Track.URI),
+			}
+		}
+		m.trackList.SetItems(items)
+		m.trackList.Select(0)
 
 	case searchResultsMsg:
 		m.searchResults = msg
 		m.searchIndex = 0
+
+	case userMsg:
+		m.user = msg
+
+	case playStartedMsg:
+		m.playingPlaylistName = string(msg)
 
 	case errorMsg:
 		m.err = string(msg)
@@ -239,6 +288,32 @@ type playlistItem struct {
 func (i playlistItem) FilterValue() string { return i.name }
 func (i playlistItem) Title() string       { return i.name }
 func (i playlistItem) Description() string { return "" }
+
+type trackItem struct {
+	index     int
+	name      string
+	artist    string
+	uri       string
+	isPlaying bool
+}
+
+func (i trackItem) FilterValue() string { return i.name }
+func (i trackItem) Title() string       { return i.name }
+func (i trackItem) Description() string { return i.artist }
+
+func (m Model) updateTrackListItems(playingURI string) []list.Item {
+	items := m.trackList.Items()
+	newItems := make([]list.Item, len(items))
+	for i, item := range items {
+		if t, ok := item.(trackItem); ok {
+			t.isPlaying = t.uri == playingURI
+			newItems[i] = t
+		} else {
+			newItems[i] = item
+		}
+	}
+	return newItems
+}
 
 type bindingMap struct{}
 
