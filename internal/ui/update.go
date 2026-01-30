@@ -39,12 +39,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 				}
 				return m, nil
-			case "up", "k":
+			case "up":
 				if len(m.searchResults) > 0 && m.searchIndex > 0 {
 					m.searchIndex--
 				}
 				return m, nil
-			case "down", "j":
+			case "down":
 				if len(m.searchResults) > 0 && m.searchIndex < len(m.searchResults)-1 {
 					m.searchIndex++
 				}
