@@ -1,4 +1,5 @@
 # Binaries
+/spotify-tui
 *.exe
 *.exe~
 *.dll
