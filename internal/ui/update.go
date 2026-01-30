@@ -114,7 +114,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.focus == FocusSidebar {
 				if item, ok := m.playlists.SelectedItem().(playlistItem); ok {
-					cmd = m.fetchPlaylistTracks(item.id)
+					if item.id == "liked" {
+						cmd = m.fetchSavedTracks()
+					} else {
+						cmd = m.fetchPlaylistTracks(spotifysdk.ID(item.id))
+					}
 				}
 			} else if m.focus == FocusMain && len(m.tracks) > 0 {
 				// プレイリストのコンテキストで再生
@@ -178,18 +182,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case playlistsMsg:
-		items := make([]list.Item, len(msg))
-		for i, pl := range msg {
-			items[i] = playlistItem{
-				id:   pl.ID,
+		// Liked Songsを先頭に追加
+		items := make([]list.Item, 0, len(msg)+1)
+		items = append(items, playlistItem{
+			id:   "liked", // 特別なID
+			name: "💚 Liked Songs",
+		})
+		for _, pl := range msg {
+			items = append(items, playlistItem{
+				id:   string(pl.ID),
 				name: pl.Name,
-			}
+			})
 		}
 		m.playlists.SetItems(items)
 
 	case tracksMsg:
 		m.tracks = msg.tracks
 		m.currentPlaylistURI = msg.playlistURI
+		m.trackIndex = 0
+
+	case savedTracksMsg:
+		// SavedTrackをPlaylistTrack形式に変換
+		tracks := make([]spotifysdk.PlaylistTrack, len(msg))
+		for i, st := range msg {
+			tracks[i] = spotifysdk.PlaylistTrack{
+				Track: st.FullTrack,
+			}
+		}
+		m.tracks = tracks
+		m.currentPlaylistURI = "spotify:user:tracks" // Liked SongsのコンテキストURI
 		m.trackIndex = 0
 
 	case searchResultsMsg:
@@ -211,7 +232,7 @@ func clearErrorAfter(d time.Duration) tea.Cmd {
 }
 
 type playlistItem struct {
-	id   spotifysdk.ID
+	id   string
 	name string
 }
 

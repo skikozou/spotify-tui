@@ -55,6 +55,29 @@ func (c *Client) PlaylistTracks(ctx context.Context, playlistID spotify.ID) ([]s
 	return tracks.Tracks, nil
 }
 
+func (c *Client) SavedTracks(ctx context.Context) ([]spotify.SavedTrack, error) {
+	// Liked Songsを取得（最大50件ずつ）
+	var allTracks []spotify.SavedTrack
+	limit := 50
+	offset := 0
+
+	for {
+		tracks, err := c.client.CurrentUsersTracks(ctx, spotify.Limit(limit), spotify.Offset(offset))
+		if err != nil {
+			return nil, err
+		}
+
+		allTracks = append(allTracks, tracks.Tracks...)
+
+		if len(tracks.Tracks) < limit {
+			break
+		}
+		offset += limit
+	}
+
+	return allTracks, nil
+}
+
 func (c *Client) PlayTrackInContext(ctx context.Context, contextURI spotify.URI, offset int) error {
 	opts := &spotify.PlayOptions{
 		PlaybackContext: &contextURI,

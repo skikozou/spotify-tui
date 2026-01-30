@@ -60,6 +60,7 @@ type tracksMsg struct {
 	tracks      []spotifysdk.PlaylistTrack
 	playlistURI spotifysdk.URI
 }
+type savedTracksMsg []spotifysdk.SavedTrack
 type searchResultsMsg []spotifysdk.FullTrack
 type errorMsg string
 
@@ -128,6 +129,16 @@ func (m Model) fetchPlaylistTracks(playlistID spotifysdk.ID) tea.Cmd {
 			tracks:      tracks,
 			playlistURI: playlistURI,
 		}
+	}
+}
+
+func (m Model) fetchSavedTracks() tea.Cmd {
+	return func() tea.Msg {
+		tracks, err := m.client.SavedTracks(m.ctx)
+		if err != nil {
+			return errorMsg(err.Error())
+		}
+		return savedTracksMsg(tracks)
 	}
 }
 
