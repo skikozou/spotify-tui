@@ -222,7 +222,14 @@ func (m Model) renderUserInfo(width int) string {
 	lines = append(lines, title)
 
 	if m.user != nil {
-		lines = append(lines, fmt.Sprintf(" Name:      %s (%s)", m.user.DisplayName, m.user.ID))
+		// 名前とIDの表示（幅に収まらない場合はIDを省略）
+		nameWithID := fmt.Sprintf(" Name:      %s (%s)", m.user.DisplayName, m.user.ID)
+		nameOnly := fmt.Sprintf(" Name:      %s", m.user.DisplayName)
+		if len(nameWithID) <= width {
+			lines = append(lines, nameWithID)
+		} else {
+			lines = append(lines, nameOnly)
+		}
 		if m.user.Product != "" {
 			lines = append(lines, fmt.Sprintf(" Plan:      %s", m.user.Product))
 		}
@@ -312,6 +319,10 @@ func (m Model) renderPlayerBar(width int) string {
 	keybindings := "[Space] Play/Pause | [n] Next | [p] Prev | [Tab] Switch | [/] Search | [q] Quit"
 	if m.err != "" {
 		keybindings = errorStyle.Render("Error: " + m.err)
+	}
+	// 幅に収まらない場合はカットして...を追加
+	if len(keybindings) > width {
+		keybindings = keybindings[:width-3] + "..."
 	}
 	lines = append(lines, keybindings)
 
