@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // TrackDelegate はトラックリスト用のカスタムデリゲート
@@ -43,12 +44,8 @@ func (d TrackDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	width := m.Width()
 
 	// 幅を制限
-	if len(titleLine) > width-2 {
-		titleLine = titleLine[:width-5] + "..."
-	}
-	if len(artistLine) > width-2 {
-		artistLine = artistLine[:width-5] + "..."
-	}
+	titleLine = truncateText(titleLine, width-2)
+	artistLine = truncateText(artistLine, width-2)
 
 	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
 	artistStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#B3B3B3"))
@@ -103,15 +100,15 @@ func (d QueueDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	fmt.Fprintf(w, "%s\n%s", titleStyle.Width(width).Render(titleLine), artistStyle.Width(width).Render(artistLine))
 }
 
-// truncateText はテキストを指定幅に収まるようにカットし、末尾に...を追加する
+// truncateText はテキストを指定幅（表示幅）に収まるようにカットし、末尾に...を追加する
 func truncateText(text string, width int) string {
-	if len(text) > width {
-		if width > 3 {
-			return text[:width-3] + "..."
-		}
-		return text[:width]
+	if runewidth.StringWidth(text) <= width {
+		return text
 	}
-	return text
+	if width <= 3 {
+		return runewidth.Truncate(text, width, "")
+	}
+	return runewidth.Truncate(text, width, "...")
 }
 
 // queueItem はキュー用のリストアイテム

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 var (
@@ -243,7 +244,7 @@ func (m Model) renderUserInfo(width int) string {
 		// 名前とIDの表示（幅に収まらない場合はIDを省略）
 		nameWithID := fmt.Sprintf(" Name:      %s (%s)", m.user.DisplayName, m.user.ID)
 		nameOnly := fmt.Sprintf(" Name:      %s", m.user.DisplayName)
-		if len(nameWithID) <= width {
+		if runewidth.StringWidth(nameWithID) <= width {
 			lines = append(lines, truncate(nameWithID, width))
 		} else {
 			lines = append(lines, truncate(nameOnly, width))
@@ -339,9 +340,7 @@ func (m Model) renderPlayerBar(width int) string {
 		keybindings = errorStyle.Render("Error: " + m.err)
 	}
 	// 幅に収まらない場合はカットして...を追加
-	if len(keybindings) > width {
-		keybindings = keybindings[:width-3] + "..."
-	}
+	keybindings = truncate(keybindings, width)
 	lines = append(lines, keybindings)
 
 	return strings.Join(lines, "\n")
@@ -373,15 +372,15 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%d:%02d", minutes, seconds)
 }
 
-// truncate はテキストを指定幅に収まるようにカットし、末尾に...を追加する
+// truncate はテキストを指定幅（表示幅）に収まるようにカットし、末尾に...を追加する
 func truncate(text string, width int) string {
-	if len(text) > width {
-		if width > 3 {
-			return text[:width-3] + "..."
-		}
-		return text[:width]
+	if runewidth.StringWidth(text) <= width {
+		return text
 	}
-	return text
+	if width <= 3 {
+		return runewidth.Truncate(text, width, "")
+	}
+	return runewidth.Truncate(text, width, "...")
 }
 
 func (m Model) renderQueue(width, height int) string {
