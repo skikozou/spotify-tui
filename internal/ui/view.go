@@ -66,10 +66,11 @@ func (m Model) View() string {
 	mainWidth := (m.width * 4) / 10
 	rightWidth := m.width - leftWidth - mainWidth
 
-	// Bottom bar height: 5 content + 2 border = 7 total
-	bottomBarHeight := 7
+	// Bottom bar: 4 content lines + 2 border = 6 total height
+	bottomContentHeight := 4
+	bottomBarHeight := bottomContentHeight + 2
 
-	// Top panel height (including border)
+	// Top panel height
 	topPanelHeight := m.height - bottomBarHeight
 	if topPanelHeight < 5 {
 		topPanelHeight = 5
@@ -119,14 +120,17 @@ func (m Model) View() string {
 
 	userInfoFinal := playerBarStyle.
 		Width(leftWidth - 2).
+		Height(bottomContentHeight).
 		Render(userInfoContent)
 
 	playerBarFinal := playerBarStyle.
 		Width(mainWidth - 2).
+		Height(bottomContentHeight).
 		Render(playerBarContent)
 
 	deviceInfoFinal := playerBarStyle.
 		Width(rightWidth - 2).
+		Height(bottomContentHeight).
 		Render(deviceInfoContent)
 
 	bottomRow := lipgloss.JoinHorizontal(

@@ -174,10 +174,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// 下部プレイヤー(7行)を引く
-		contentHeight := msg.Height - 7
+		// 下部バー: 4コンテンツ + 2ボーダー = 6行
+		bottomBarHeight := 6
+		// 上部パネルの高さ
+		topPanelHeight := msg.Height - bottomBarHeight
 		// タイトル分(2行)とボーダー(2行)を引く
-		listHeight := contentHeight - 4
+		listHeight := topPanelHeight - 4
 		if listHeight < 3 {
 			listHeight = 3
 		}
