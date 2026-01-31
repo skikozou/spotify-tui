@@ -125,7 +125,16 @@ func (m Model) View() string {
 func (m Model) renderSidebar(width, height int) string {
 	title := titleStyle.Render(" 🎵 My Library")
 
-	content := m.playlists.View()
+	var content string
+	if len(m.playlists.Items()) == 0 {
+		content = lipgloss.Place(
+			width, height-4,
+			lipgloss.Center, lipgloss.Center,
+			"Loading...",
+		)
+	} else {
+		content = m.playlists.View()
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
 }
