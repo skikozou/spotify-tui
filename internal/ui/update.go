@@ -174,22 +174,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// 下部バー: 4コンテンツ + 2ボーダー = 6行
-		bottomBarHeight := 6
-		// 上部パネルの高さ
-		topPanelHeight := msg.Height - bottomBarHeight
-		// タイトル分(2行)とボーダー(2行)を引く
-		listHeight := topPanelHeight - 4
-		if listHeight < 3 {
-			listHeight = 3
-		}
-		// 3:4:3 layout
-		leftWidth := msg.Width * 3 / 10
-		mainWidth := msg.Width * 4 / 10
-		rightWidth := msg.Width - leftWidth - mainWidth
-		m.playlists.SetSize(leftWidth-4, listHeight)
-		m.trackList.SetSize(mainWidth-4, listHeight)
-		m.queueList.SetSize(rightWidth-4, listHeight)
+		layout := CalculateLayout(msg.Width, msg.Height)
+		m.playlists.SetSize(layout.LeftContentWidth, layout.ListHeight)
+		m.trackList.SetSize(layout.MainContentWidth, layout.ListHeight)
+		m.queueList.SetSize(layout.RightContentWidth, layout.ListHeight)
 
 	case tickMsg:
 		// シークバーをスムーズに更新

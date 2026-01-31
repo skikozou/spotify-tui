@@ -61,40 +61,25 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
-	// 3:4:3 layout
-	leftWidth := (m.width * 3) / 10
-	mainWidth := (m.width * 4) / 10
-	rightWidth := m.width - leftWidth - mainWidth
-
-	// Bottom bar: 4 content lines + 2 border = 6 total height
-	bottomContentHeight := 4
-	bottomBarHeight := bottomContentHeight + 2
-
-	// Top panel height
-	topPanelHeight := m.height - bottomBarHeight
-	if topPanelHeight < 5 {
-		topPanelHeight = 5
-	}
-	// Content height inside panel (subtract border: 2)
-	topContentHeight := topPanelHeight - 2
+	layout := CalculateLayout(m.width, m.height)
 
 	// Render top row content
-	sidebarContent := m.renderSidebar(leftWidth-4, topContentHeight)
-	mainContent := m.renderMainPanel(mainWidth-4, topContentHeight)
-	queueContent := m.renderQueue(rightWidth-4, topContentHeight)
+	sidebarContent := m.renderSidebar(layout.LeftContentWidth, layout.TopContentHeight)
+	mainContent := m.renderMainPanel(layout.MainContentWidth, layout.TopContentHeight)
+	queueContent := m.renderQueue(layout.RightContentWidth, layout.TopContentHeight)
 
 	// Apply borders and styling
 	sidebarStyleFinal := sidebarStyle.
-		Width(leftWidth - 2).
-		Height(topContentHeight)
+		Width(layout.LeftWidth - borderSize).
+		Height(layout.TopContentHeight)
 
 	mainPanelStyleFinal := mainPanelStyle.
-		Width(mainWidth - 2).
-		Height(topContentHeight)
+		Width(layout.MainWidth - borderSize).
+		Height(layout.TopContentHeight)
 
 	rightPanelStyleFinal := mainPanelStyle.Copy().
-		Width(rightWidth - 2).
-		Height(topContentHeight)
+		Width(layout.RightWidth - borderSize).
+		Height(layout.TopContentHeight)
 
 	switch m.focus {
 	case FocusSidebar:
@@ -114,23 +99,23 @@ func (m Model) View() string {
 	)
 
 	// Bottom bar: user info (left) + player bar (center) + device info (right)
-	userInfoContent := m.renderUserInfo(leftWidth - 4)
-	playerBarContent := m.renderPlayerBar(mainWidth - 4)
-	deviceInfoContent := m.renderDeviceInfo(rightWidth - 4)
+	userInfoContent := m.renderUserInfo(layout.LeftContentWidth)
+	playerBarContent := m.renderPlayerBar(layout.MainContentWidth)
+	deviceInfoContent := m.renderDeviceInfo(layout.RightContentWidth)
 
 	userInfoFinal := playerBarStyle.
-		Width(leftWidth - 2).
-		Height(bottomContentHeight).
+		Width(layout.LeftWidth - borderSize).
+		Height(layout.BottomContentHeight).
 		Render(userInfoContent)
 
 	playerBarFinal := playerBarStyle.
-		Width(mainWidth - 2).
-		Height(bottomContentHeight).
+		Width(layout.MainWidth - borderSize).
+		Height(layout.BottomContentHeight).
 		Render(playerBarContent)
 
 	deviceInfoFinal := playerBarStyle.
-		Width(rightWidth - 2).
-		Height(bottomContentHeight).
+		Width(layout.RightWidth - borderSize).
+		Height(layout.BottomContentHeight).
 		Render(deviceInfoContent)
 
 	bottomRow := lipgloss.JoinHorizontal(
