@@ -131,18 +131,18 @@ func (m Model) View() string {
 func (m Model) renderSidebar(width, height int) string {
 	title := titleStyle.Render(truncate(" 🎵 My Library", width))
 
-	var content string
 	if len(m.playlists.Items()) == 0 {
-		content = lipgloss.Place(
-			width, height-4,
+		return lipgloss.Place(
+			width, height,
 			lipgloss.Center, lipgloss.Center,
 			"Loading...",
 		)
-	} else {
-		content = m.playlists.View()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	content := m.playlists.View()
+	inner := lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 }
 
 func (m Model) renderMainPanel(width, height int) string {
@@ -168,8 +168,9 @@ func (m Model) renderMainPanel(width, height int) string {
 
 	title := titleStyle.Render(truncate(" 📀 Tracks", width))
 	content := m.trackList.View()
+	inner := lipgloss.JoinVertical(lipgloss.Left, title, "", content)
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 }
 
 func (m Model) renderSearchView(width, height int) string {
@@ -187,7 +188,8 @@ func (m Model) renderSearchView(width, height int) string {
 		} else {
 			lines = append(lines, " No results found")
 		}
-		return strings.Join(lines, "\n")
+		inner := strings.Join(lines, "\n")
+		return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 	}
 
 	// 検索結果を表示
@@ -227,7 +229,8 @@ func (m Model) renderSearchView(width, height int) string {
 		lines = append(lines, line)
 	}
 
-	return strings.Join(lines, "\n")
+	inner := strings.Join(lines, "\n")
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 }
 
 func (m Model) renderUserInfo(width int) string {
@@ -385,12 +388,14 @@ func (m Model) renderQueue(width, height int) string {
 	title := titleStyle.Render(truncate(" 📋 Queue", width))
 
 	if len(m.queue) == 0 {
-		return lipgloss.JoinVertical(lipgloss.Left, title, "", " No tracks in queue")
+		inner := lipgloss.JoinVertical(lipgloss.Left, title, "", " No tracks in queue")
+		return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 	}
 
 	content := m.queueList.View()
+	inner := lipgloss.JoinVertical(lipgloss.Left, title, "", content)
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, inner)
 }
 
 func (m Model) renderDeviceInfo(width int) string {
