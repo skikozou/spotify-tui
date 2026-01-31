@@ -16,6 +16,7 @@ type FocusPanel int
 const (
 	FocusSidebar FocusPanel = iota
 	FocusMain
+	FocusQueue
 )
 
 type Model struct {
@@ -55,7 +56,8 @@ type Model struct {
 	repeatState     string
 
 	// Queue
-	queue []spotifysdk.FullTrack
+	queue     []spotifysdk.FullTrack
+	queueList list.Model
 
 	// Devices
 	devices      []spotifysdk.PlayerDevice
@@ -100,12 +102,20 @@ func NewModel(ctx context.Context, client *spotify.Client) Model {
 	trackList.SetShowStatusBar(false)
 	trackList.SetShowTitle(false)
 
+	queueDelegate := NewQueueDelegate()
+	queueList := list.New([]list.Item{}, queueDelegate, 0, 0)
+	queueList.SetShowHelp(false)
+	queueList.SetFilteringEnabled(false)
+	queueList.SetShowStatusBar(false)
+	queueList.SetShowTitle(false)
+
 	return Model{
 		ctx:         ctx,
 		client:      client,
 		focus:       FocusSidebar,
 		playlists:   playlistList,
 		trackList:   trackList,
+		queueList:   queueList,
 		lastUpdate:  time.Now(),
 		repeatState: "off",
 	}
@@ -203,6 +213,17 @@ func (m Model) playTrackInPlaylist(offset int) tea.Cmd {
 func (m Model) playTrackAlone(uri spotifysdk.URI) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.PlayTrackAlone(m.ctx, uri); err != nil {
+			return errorMsg(err.Error())
+		}
+		return nil
+	}
+}
+
+func (m Model) skipToQueueIndex(index int) tea.Cmd {
+	return func() tea.Msg {
+		// index 0 = 現在再生中の次の曲なので、index+1回スキップする
+		skipCount := index + 1
+		if err := m.client.SkipToNth(m.ctx, skipCount); err != nil {
 			return errorMsg(err.Error())
 		}
 		return nil

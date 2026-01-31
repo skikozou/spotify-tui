@@ -97,14 +97,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return nil
 			}
 
-		case "tab", "shift+tab":
-			// フォーカス切り替え
-			if m.focus == FocusSidebar {
+		case "tab":
+			// フォーカス切り替え（Sidebar -> Main -> Queue -> Sidebar）
+			switch m.focus {
+			case FocusSidebar:
 				m.focus = FocusMain
-			} else {
+			case FocusMain:
+				m.focus = FocusQueue
+			case FocusQueue:
 				m.focus = FocusSidebar
 			}
-			// listの更新をスキップするため早期リターン
+			return m, nil
+
+		case "shift+tab":
+			// 逆方向のフォーカス切り替え
+			switch m.focus {
+			case FocusSidebar:
+				m.focus = FocusQueue
+			case FocusMain:
+				m.focus = FocusSidebar
+			case FocusQueue:
+				m.focus = FocusMain
+			}
 			return m, nil
 
 		case "/":
@@ -127,6 +141,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if item, ok := m.trackList.SelectedItem().(trackItem); ok {
 					cmd = m.playTrackInPlaylist(item.index)
 				}
+			} else if m.focus == FocusQueue && len(m.queue) > 0 {
+				// キューから再生（選択位置までスキップ）
+				selectedIdx := m.queueList.Index()
+				cmd = m.skipToQueueIndex(selectedIdx)
 			}
 
 		case "up", "k", "down", "j":
@@ -134,6 +152,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.playlists, cmd = m.playlists.Update(msg)
 			} else if m.focus == FocusMain {
 				m.trackList, cmd = m.trackList.Update(msg)
+			} else if m.focus == FocusQueue {
+				m.queueList, cmd = m.queueList.Update(msg)
 			}
 
 		default:
@@ -142,6 +162,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.playlists, cmd = m.playlists.Update(msg)
 			} else if m.focus == FocusMain {
 				m.trackList, cmd = m.trackList.Update(msg)
+			} else if m.focus == FocusQueue {
+				m.queueList, cmd = m.queueList.Update(msg)
 			}
 		}
 
@@ -154,16 +176,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		// 下部プレイヤー(7行)を引く
 		contentHeight := msg.Height - 7
-		// タイトル分(2行)を引く
-		listHeight := contentHeight - 2 - 2
+		// タイトル分(2行)とボーダー(2行)を引く
+		listHeight := contentHeight - 4
 		if listHeight < 3 {
 			listHeight = 3
 		}
 		// 3:4:3 layout
 		leftWidth := msg.Width * 3 / 10
 		mainWidth := msg.Width * 4 / 10
+		rightWidth := msg.Width - leftWidth - mainWidth
 		m.playlists.SetSize(leftWidth-4, listHeight)
 		m.trackList.SetSize(mainWidth-4, listHeight)
+		m.queueList.SetSize(rightWidth-4, listHeight)
 
 	case tickMsg:
 		// シークバーをスムーズに更新
@@ -270,6 +294,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case queueMsg:
 		if msg != nil {
 			m.queue = msg.Items
+			// queueListを更新（選択位置を保持）
+			selectedIdx := m.queueList.Index()
+			items := make([]list.Item, len(msg.Items))
+			for i, t := range msg.Items {
+				items[i] = queueItem{
+					name:   t.Name,
+					artist: t.Artists[0].Name,
+					uri:    string(t.URI),
+				}
+			}
+			m.queueList.SetItems(items)
+			// 選択位置を復元（アイテム数が変わった場合は範囲内に収める）
+			if selectedIdx >= len(items) {
+				selectedIdx = len(items) - 1
+			}
+			if selectedIdx >= 0 {
+				m.queueList.Select(selectedIdx)
+			}
 		}
 
 	case devicesMsg:

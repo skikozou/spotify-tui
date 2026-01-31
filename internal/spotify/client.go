@@ -35,6 +35,15 @@ func (c *Client) Next(ctx context.Context) error {
 	return c.client.Next(ctx)
 }
 
+func (c *Client) SkipToNth(ctx context.Context, n int) error {
+	for i := 0; i < n; i++ {
+		if err := c.client.Next(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Client) Previous(ctx context.Context) error {
 	return c.client.Previous(ctx)
 }
