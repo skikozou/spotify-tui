@@ -61,12 +61,13 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
-	// Sidebar is 30% of width
-	sidebarWidth := (m.width * 3) / 10
-	mainWidth := m.width - sidebarWidth
+	// 3:4:3 layout
+	leftWidth := (m.width * 3) / 10
+	mainWidth := (m.width * 4) / 10
+	rightWidth := m.width - leftWidth - mainWidth
 
-	// Bottom bar: user info (5 lines) + border (2) = 7 total
-	bottomBarHeight := 8
+	// Bottom bar height: 7 total (5 content + 2 border)
+	bottomBarHeight := 7
 
 	// Content area is remaining height
 	contentHeight := m.height - bottomBarHeight
@@ -74,19 +75,22 @@ func (m Model) View() string {
 		contentHeight = 5
 	}
 
-	// Render content (subtract border width: 2 for each panel)
-	sidebarContent := m.renderSidebar(sidebarWidth-2, contentHeight-2)
+	// Render top row content
+	sidebarContent := m.renderSidebar(leftWidth-2, contentHeight-2)
 	mainContent := m.renderMainPanel(mainWidth-2, contentHeight-2)
-	// Player bar width: mainWidth - border(2) - padding(2)
-	playerBarContent := m.renderPlayerBar(mainWidth - 4)
+	queueContent := m.renderQueue(rightWidth-2, contentHeight-2)
 
 	// Apply borders and styling
 	sidebarStyleFinal := sidebarStyle.
-		Width(sidebarWidth - 2).
+		Width(leftWidth - 2).
 		Height(contentHeight)
 
 	mainPanelStyleFinal := mainPanelStyle.
 		Width(mainWidth - 2).
+		Height(contentHeight)
+
+	rightPanelStyleFinal := mainPanelStyle.Copy().
+		Width(rightWidth - 2).
 		Height(contentHeight)
 
 	if m.focus == FocusSidebar {
@@ -95,28 +99,36 @@ func (m Model) View() string {
 		mainPanelStyleFinal = mainPanelStyleFinal.Copy().BorderForeground(primaryColor)
 	}
 
-	// Layout
+	// Top row: sidebar + main + queue
 	topRow := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		sidebarStyleFinal.Render(sidebarContent),
 		mainPanelStyleFinal.Render(mainContent),
+		rightPanelStyleFinal.Render(queueContent),
 	)
 
-	// Bottom bar: user info (left) + player bar (right)
-	userInfoContent := m.renderUserInfo(sidebarWidth - 4)
+	// Bottom bar: user info (left) + player bar (center) + device info (right)
+	userInfoContent := m.renderUserInfo(leftWidth - 4)
+	playerBarContent := m.renderPlayerBar(mainWidth - 4)
+	deviceInfoContent := m.renderDeviceInfo(rightWidth - 4)
 
 	userInfoFinal := playerBarStyle.
-		Width(sidebarWidth - 2).
+		Width(leftWidth - 2).
 		Render(userInfoContent)
 
 	playerBarFinal := playerBarStyle.
 		Width(mainWidth - 2).
 		Render(playerBarContent)
 
+	deviceInfoFinal := playerBarStyle.
+		Width(rightWidth - 2).
+		Render(deviceInfoContent)
+
 	bottomRow := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		userInfoFinal,
 		playerBarFinal,
+		deviceInfoFinal,
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
@@ -362,4 +374,76 @@ func formatDuration(d time.Duration) string {
 	minutes := int(d.Minutes())
 	seconds := int(d.Seconds()) % 60
 	return fmt.Sprintf("%d:%02d", minutes, seconds)
+}
+
+func (m Model) renderQueue(width, height int) string {
+	var lines []string
+	title := titleStyle.Render(" 📋 Queue")
+	lines = append(lines, title, "")
+
+	if len(m.queue) == 0 {
+		lines = append(lines, " No tracks in queue")
+		return strings.Join(lines, "\n")
+	}
+
+	// 表示可能な行数（2行/曲）
+	visibleTracks := (height - 3) / 2
+	if visibleTracks < 1 {
+		visibleTracks = 1
+	}
+
+	for i := 0; i < len(m.queue) && i < visibleTracks; i++ {
+		track := m.queue[i]
+		trackName := track.Name
+		artistName := track.Artists[0].Name
+
+		// 幅制限
+		if len(trackName) > width-3 {
+			trackName = trackName[:width-6] + "..."
+		}
+		if len(artistName) > width-3 {
+			artistName = artistName[:width-6] + "..."
+		}
+
+		lines = append(lines, fmt.Sprintf(" %s", trackName))
+		artistLine := lipgloss.NewStyle().Foreground(accentColor).Render(fmt.Sprintf(" %s", artistName))
+		lines = append(lines, artistLine)
+	}
+
+	if len(m.queue) > visibleTracks {
+		lines = append(lines, fmt.Sprintf(" ... +%d more", len(m.queue)-visibleTracks))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderDeviceInfo(width int) string {
+	var lines []string
+
+	title := titleStyle.Render("🔊 Device")
+	lines = append(lines, title)
+
+	if m.activeDevice != nil {
+		deviceName := m.activeDevice.Name
+		if len(deviceName) > width-2 {
+			deviceName = deviceName[:width-5] + "..."
+		}
+		lines = append(lines, fmt.Sprintf(" %s", deviceName))
+		lines = append(lines, fmt.Sprintf(" Type: %s", m.activeDevice.Type))
+
+		// Volume bar
+		volBarWidth := width - 12
+		if volBarWidth < 5 {
+			volBarWidth = 5
+		}
+		volFilled := (m.volume * volBarWidth) / 100
+		volBar := strings.Repeat("█", volFilled) + strings.Repeat("░", volBarWidth-volFilled)
+		lines = append(lines, fmt.Sprintf(" Vol: [%s]", volBar))
+	} else if len(m.devices) > 0 {
+		lines = append(lines, " No active device")
+	} else {
+		lines = append(lines, " Loading...")
+	}
+
+	return strings.Join(lines, "\n")
 }

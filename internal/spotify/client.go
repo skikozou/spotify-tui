@@ -147,3 +147,19 @@ func (c *Client) Search(ctx context.Context, query string) ([]spotify.FullTrack,
 func (c *Client) CurrentUser(ctx context.Context) (*spotify.PrivateUser, error) {
 	return c.client.CurrentUser(ctx)
 }
+
+func (c *Client) GetQueue(ctx context.Context) (*spotify.Queue, error) {
+	return c.client.GetQueue(ctx)
+}
+
+func (c *Client) PlayerDevices(ctx context.Context) ([]spotify.PlayerDevice, error) {
+	return c.client.PlayerDevices(ctx)
+}
+
+func (c *Client) SetVolume(ctx context.Context, volume int) error {
+	return c.client.Volume(ctx, volume)
+}
+
+func (c *Client) TransferPlayback(ctx context.Context, deviceID spotify.ID) error {
+	return c.client.TransferPlayback(ctx, deviceID, true)
+}

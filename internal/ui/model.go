@@ -54,6 +54,14 @@ type Model struct {
 	shuffle         bool
 	repeatState     string
 
+	// Queue
+	queue []spotifysdk.FullTrack
+
+	// Devices
+	devices      []spotifysdk.PlayerDevice
+	activeDevice *spotifysdk.PlayerDevice
+	volume       int
+
 	// User
 	user *spotifysdk.PrivateUser
 
@@ -71,6 +79,8 @@ type tracksMsg struct {
 type savedTracksMsg []spotifysdk.SavedTrack
 type searchResultsMsg []spotifysdk.FullTrack
 type userMsg *spotifysdk.PrivateUser
+type queueMsg *spotifysdk.Queue
+type devicesMsg []spotifysdk.PlayerDevice
 type errorMsg string
 
 func NewModel(ctx context.Context, client *spotify.Client) Model {
@@ -105,6 +115,8 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchPlaylists(),
 		m.fetchUser(),
+		m.fetchQueue(),
+		m.fetchDevices(),
 		tickCmd(),
 	)
 }
@@ -251,5 +263,25 @@ func (m Model) fetchUser() tea.Cmd {
 			return errorMsg(err.Error())
 		}
 		return userMsg(user)
+	}
+}
+
+func (m Model) fetchQueue() tea.Cmd {
+	return func() tea.Msg {
+		queue, err := m.client.GetQueue(m.ctx)
+		if err != nil {
+			return errorMsg(err.Error())
+		}
+		return queueMsg(queue)
+	}
+}
+
+func (m Model) fetchDevices() tea.Cmd {
+	return func() tea.Msg {
+		devices, err := m.client.PlayerDevices(m.ctx)
+		if err != nil {
+			return errorMsg(err.Error())
+		}
+		return devicesMsg(devices)
 	}
 }

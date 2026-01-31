@@ -159,9 +159,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if listHeight < 3 {
 			listHeight = 3
 		}
-		sidebarWidth := msg.Width * 3 / 10
-		mainWidth := msg.Width - sidebarWidth
-		m.playlists.SetSize(sidebarWidth-4, listHeight)
+		// 3:4:3 layout
+		leftWidth := msg.Width * 3 / 10
+		mainWidth := msg.Width * 4 / 10
+		m.playlists.SetSize(leftWidth-4, listHeight)
 		m.trackList.SetSize(mainWidth-4, listHeight)
 
 	case tickMsg:
@@ -175,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.lastUpdate = time.Now()
 
-		cmds = append(cmds, tickCmd(), m.fetchCurrentPlayback())
+		cmds = append(cmds, tickCmd(), m.fetchCurrentPlayback(), m.fetchQueue(), m.fetchDevices())
 
 	case playbackMsg:
 		if msg != nil && msg.Item != nil {
@@ -265,6 +266,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case playStartedMsg:
 		m.playingPlaylistName = string(msg)
+
+	case queueMsg:
+		if msg != nil {
+			m.queue = msg.Items
+		}
+
+	case devicesMsg:
+		m.devices = msg
+		// アクティブなデバイスを見つける
+		m.activeDevice = nil
+		for i := range msg {
+			if msg[i].Active {
+				m.activeDevice = &msg[i]
+				m.volume = int(msg[i].Volume)
+				break
+			}
+		}
 
 	case errorMsg:
 		m.err = string(msg)
