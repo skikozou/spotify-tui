@@ -333,11 +333,16 @@ func (m Model) renderPlayerBar(width int) string {
 		repeatIcon = "➡"
 	}
 
-	controls := fmt.Sprintf("%s %s %s", shuffleIcon, playPauseIcon, repeatIcon)
+	autoplayIcon := "⏹"
+	if m.autoplayEnabled {
+		autoplayIcon = "∞"
+	}
+
+	controls := fmt.Sprintf("%s %s %s %s", shuffleIcon, playPauseIcon, repeatIcon, autoplayIcon)
 	lines = append(lines, controls)
 
 	// Keybindings
-	keybindings := "[Space] Play/Pause | [n] Next | [p] Prev | [Tab] Switch | [/] Search | [q] Quit"
+	keybindings := "[Space] Play/Pause | [n] Next | [p] Prev | [a] Autoplay | [Tab] Switch | [q] Quit"
 	if m.err != "" {
 		keybindings = errorStyle.Render("Error: " + m.err)
 	}
