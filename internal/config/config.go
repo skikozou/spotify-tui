@@ -68,3 +68,12 @@ func (c *Config) Save() error {
 
 	return os.WriteFile(path, data, 0600)
 }
+
+// Path は設定ファイルのパスを返す
+func (c *Config) Path() string {
+	path, err := ConfigPath()
+	if err != nil {
+		return ""
+	}
+	return path
+}

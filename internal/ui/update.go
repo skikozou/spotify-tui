@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"spotify-tui/internal/logger"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -318,6 +319,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errorMsg:
 		m.err = string(msg)
+		if string(msg) != "" {
+			logger.Error("UI error", "message", string(msg))
+		}
 		cmds = append(cmds, clearErrorAfter(3*time.Second))
 	}
 

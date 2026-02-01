@@ -2,23 +2,44 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
 	"spotify-tui/internal/auth"
 	"spotify-tui/internal/config"
+	"spotify-tui/internal/logger"
 	"spotify-tui/internal/spotify"
 	"spotify-tui/internal/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+const defaultLogFile = "log/spotify-tui.log"
+
 func main() {
+	// Parse command-line flags
+	debug := flag.Bool("debug", false, "Enable debug mode (log to file)")
+	logFile := flag.String("log-file", "", "Log file path (default: ./log/spotify-tui.log)")
+	flag.Parse()
+
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	// Initialize logger
+	logFilePath := *logFile
+	if logFilePath == "" {
+		logFilePath = defaultLogFile
+	}
+	if err := logger.Init(*debug, logFilePath); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+
+	logger.Info("Application started", "debug", *debug)
 
 	// Check if client credentials are set
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {

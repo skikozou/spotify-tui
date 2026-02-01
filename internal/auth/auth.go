@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"spotify-tui/internal/config"
+	"spotify-tui/internal/logger"
 
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -33,6 +34,8 @@ var (
 )
 
 func Authenticate(cfg *config.Config) (*spotify.Client, error) {
+	logger.Debug("Starting authentication")
+
 	auth = spotifyauth.New(
 		spotifyauth.WithRedirectURL(redirectURI),
 		spotifyauth.WithScopes(scopes...),
@@ -42,6 +45,7 @@ func Authenticate(cfg *config.Config) (*spotify.Client, error) {
 
 	// 既存のトークンがあれば使用
 	if cfg.AccessToken != "" {
+		logger.Debug("Existing token found, attempting to reuse")
 		token := &oauth2.Token{
 			AccessToken:  cfg.AccessToken,
 			RefreshToken: cfg.RefreshToken,
@@ -53,19 +57,23 @@ func Authenticate(cfg *config.Config) (*spotify.Client, error) {
 		// トークンが有効かチェック
 		_, err := client.CurrentUser(context.Background())
 		if err == nil {
+			logger.Info("Authentication successful with existing token")
 			return client, nil
 		}
+		logger.Debug("Existing token invalid, need new authentication", "error", err)
 	}
 
 	// 新規認証
+	logger.Info("Starting new OAuth flow")
 	http.HandleFunc("/callback", completeAuth)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Got request for:", r.URL.String())
+		logger.Debug("HTTP request received", "url", r.URL.String())
 	})
 
 	go func() {
 		err := http.ListenAndServe(":8080", nil)
 		if err != nil {
+			logger.Error("HTTP server error", "error", err)
 			log.Fatal(err)
 		}
 	}()
@@ -76,30 +84,37 @@ func Authenticate(cfg *config.Config) (*spotify.Client, error) {
 
 	// Wait for auth to complete
 	token := <-ch
+	logger.Info("OAuth token received")
 
 	// Save token to config
 	cfg.AccessToken = token.AccessToken
 	cfg.RefreshToken = token.RefreshToken
 	cfg.TokenExpiry = token.Expiry.Unix()
 	if err := cfg.Save(); err != nil {
+		logger.Error("Failed to save token to config", "error", err)
 		return nil, err
 	}
+	logger.Debug("Token saved to config")
 
 	client := spotify.New(auth.Client(context.Background(), token))
 	return client, nil
 }
 
 func completeAuth(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("OAuth callback received")
 	token, err := auth.Token(r.Context(), state, r)
 	if err != nil {
+		logger.Error("Failed to get token from callback", "error", err)
 		http.Error(w, "Couldn't get token", http.StatusForbidden)
 		log.Fatal(err)
 	}
 	if st := r.FormValue("state"); st != state {
+		logger.Error("OAuth state mismatch", "expected", state, "got", st)
 		http.NotFound(w, r)
 		log.Fatalf("State mismatch: %s != %s\n", st, state)
 	}
 
+	logger.Info("OAuth callback completed successfully")
 	fmt.Fprintf(w, "Login Completed! You can close this window and return to the terminal.")
 	ch <- token
 }
