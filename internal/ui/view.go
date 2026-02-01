@@ -184,7 +184,7 @@ func (m Model) renderSearchView(width, height int) string {
 		if m.searchQuery == "" {
 			hint := lipgloss.NewStyle().
 				Foreground(accentColor).
-				Render(" Type to search, press Enter to execute, Esc to exit")
+				Render(truncate(" Type to search, Enter to execute, Esc to exit", width))
 			lines = append(lines, hint)
 		} else {
 			lines = append(lines, " No results found")
@@ -196,7 +196,7 @@ func (m Model) renderSearchView(width, height int) string {
 	// 検索結果を表示
 	lines = append(lines, lipgloss.NewStyle().
 		Foreground(accentColor).
-		Render(fmt.Sprintf(" Found %d results:", len(m.searchResults))))
+		Render(truncate(fmt.Sprintf(" Found %d results:", len(m.searchResults)), width)))
 	lines = append(lines, "")
 
 	// スクロール可能な結果リスト
@@ -222,9 +222,11 @@ func (m Model) renderSearchView(width, height int) string {
 		)
 
 		if i == m.searchIndex {
-			line = selectedTrackStyle.Render(" ▶" + line)
+			// 選択中: " ▶" (3文字分) + line
+			line = selectedTrackStyle.Width(width).Render(truncate(" ▶"+line, width))
 		} else {
-			line = trackStyle.Render("  " + line)
+			// 非選択: "  " (2文字分) + line
+			line = trackStyle.Width(width).Render(truncate("  "+line, width))
 		}
 
 		lines = append(lines, line)
