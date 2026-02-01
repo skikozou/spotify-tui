@@ -98,15 +98,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return nil
 			}
 
-		case "a":
-			m.autoplayEnabled = !m.autoplayEnabled
-			status := "disabled"
-			if m.autoplayEnabled {
-				status = "enabled"
-			}
-			logger.Info("Autoplay toggled", "status", status)
-			return m, nil
-
 		case "tab":
 			// フォーカス切り替え（Sidebar -> Main -> Queue -> Sidebar）
 			switch m.focus {
@@ -213,12 +204,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if time.Since(m.lastDeviceFetch) >= 10*time.Second {
 			cmds = append(cmds, m.fetchDevices())
 			m.lastDeviceFetch = time.Now()
-		}
-
-		// Autoplayチェック
-		if m.shouldTriggerAutoplay() {
-			m.recommendationInProgress = true
-			cmds = append(cmds, m.fetchRecommendations())
 		}
 
 	case playbackMsg:
@@ -351,66 +336,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logger.Error("UI error", "message", string(msg))
 		}
 		cmds = append(cmds, clearErrorAfter(3*time.Second))
-
-	case recommendationsMsg:
-		m.recommendationInProgress = false
-		m.lastRecommendationTime = time.Now()
-
-		if msg.err != nil {
-			logger.Error("Autoplay: failed to get recommendations", "error", msg.err)
-			m.err = "Autoplay: " + msg.err.Error()
-			m.isInitialAutoplay = false
-			cmds = append(cmds, clearErrorAfter(3*time.Second))
-			return m, tea.Batch(cmds...)
-		}
-
-		// 重複をフィルタリング
-		filtered := m.filterRecommendations(msg.tracks)
-
-		// バッチサイズを決定（初回は多め、補充時は少なめ）
-		batchSize := autoplayBatchSize
-		if m.isInitialAutoplay {
-			batchSize = autoplayInitialBatchSize
-			m.isInitialAutoplay = false
-		}
-
-		// バッチサイズ分だけキューに追加
-		var queueCmds []tea.Cmd
-		count := 0
-		for _, track := range filtered {
-			if count >= batchSize {
-				break
-			}
-			trackID := track.ID
-			m.markAsQueued(string(trackID))
-			queueCmds = append(queueCmds, m.queueTrack(trackID))
-			count++
-		}
-
-		if len(queueCmds) > 0 {
-			logger.Info("Autoplay: queuing tracks", "count", count, "initial", batchSize == autoplayInitialBatchSize)
-			cmds = append(cmds, queueCmds...)
-		}
-
-	case queueTrackResultMsg:
-		if msg.err != nil {
-			logger.Error("Autoplay: failed to queue track", "trackID", msg.trackID, "error", msg.err)
-		} else {
-			logger.Debug("Autoplay: track queued", "trackID", msg.trackID)
-		}
-
-	case singleTrackPlayedMsg:
-		// 単曲再生時: Autoplayが有効なら関連曲をキューに追加
-		if m.autoplayEnabled {
-			logger.Info("Autoplay: single track played, fetching recommendations", "trackID", msg.trackID)
-			m.recommendationInProgress = true
-			m.isInitialAutoplay = true // 初回フラグをセット
-			// 重複防止リストをクリアして新しいセッションを開始
-			m.recentlyQueuedTracks = make(map[string]bool)
-			m.recentlyQueuedList = make([]string, 0)
-			m.markAsQueued(string(msg.trackID)) // 再生中の曲は除外
-			cmds = append(cmds, m.fetchRecommendationsForTrack(msg.trackID))
-		}
 	}
 
 	return m, tea.Batch(cmds...)

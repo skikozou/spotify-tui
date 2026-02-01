@@ -275,28 +275,3 @@ func (c *Client) TransferPlayback(ctx context.Context, deviceID spotify.ID) erro
 	}
 	return err
 }
-
-// GetRecommendations はシードに基づいてレコメンデーションを取得する
-func (c *Client) GetRecommendations(ctx context.Context, seeds spotify.Seeds, limit int) (*spotify.Recommendations, error) {
-	logger.Debug("API call", "method", "GetRecommendations",
-		"seedTracks", len(seeds.Tracks),
-		"seedArtists", len(seeds.Artists),
-		"limit", limit)
-	result, err := c.client.GetRecommendations(ctx, seeds, nil, spotify.Limit(limit))
-	if err != nil {
-		logger.Error("API error", "method", "GetRecommendations", "error", err)
-		return nil, err
-	}
-	logger.Debug("API call completed", "method", "GetRecommendations", "trackCount", len(result.Tracks))
-	return result, nil
-}
-
-// QueueTrack はトラックをキューに追加する
-func (c *Client) QueueTrack(ctx context.Context, trackID spotify.ID) error {
-	logger.Debug("API call", "method", "QueueTrack", "trackID", trackID)
-	err := c.client.QueueSong(ctx, trackID)
-	if err != nil {
-		logger.Error("API error", "method", "QueueTrack", "error", err)
-	}
-	return err
-}
