@@ -38,19 +38,26 @@ func CalculateLayout(width, height int) Layout {
 	mainWidth := (width * 4) / 10
 	rightWidth := width - leftWidth - mainWidth
 
-	// Vertical split
+	// Vertical split - ensure total height never exceeds terminal height
 	topPanelHeight := height - bottomBarHeight
-	if topPanelHeight < 5 {
+	if topPanelHeight < 5 && height >= 11 {
+		// Only enforce minimum if terminal is tall enough
 		topPanelHeight = 5
+	}
+	if topPanelHeight < 1 {
+		topPanelHeight = 1
 	}
 
 	// Content heights (subtract border)
 	topContentHeight := topPanelHeight - borderSize
+	if topContentHeight < 1 {
+		topContentHeight = 1
+	}
 
 	// List height (subtract title lines from content)
 	listHeight := topContentHeight - topPanelTitleLines
-	if listHeight < 3 {
-		listHeight = 3
+	if listHeight < 1 {
+		listHeight = 1
 	}
 
 	return Layout{

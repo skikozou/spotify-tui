@@ -62,6 +62,15 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
+	// Minimum size check
+	if m.height < 15 || m.width < 100 {
+		return lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			"Terminal too small\n(min: 100x15)",
+		)
+	}
+
 	layout := CalculateLayout(m.width, m.height)
 
 	// Render top row content
@@ -70,17 +79,24 @@ func (m Model) View() string {
 	queueContent := m.renderQueue(layout.RightContentWidth, layout.TopContentHeight)
 
 	// Apply borders and styling
+	// lipgloss Height() is for content inside border, border is added on top
+	// So we need to account for this by subtracting border from total height
+	panelHeight := layout.TopPanelHeight - borderSize
+	if panelHeight < 1 {
+		panelHeight = 1
+	}
+
 	sidebarStyleFinal := sidebarStyle.
 		Width(layout.LeftWidth - borderSize).
-		Height(layout.TopContentHeight)
+		Height(panelHeight)
 
 	mainPanelStyleFinal := mainPanelStyle.
 		Width(layout.MainWidth - borderSize).
-		Height(layout.TopContentHeight)
+		Height(panelHeight)
 
 	rightPanelStyleFinal := mainPanelStyle.Copy().
 		Width(layout.RightWidth - borderSize).
-		Height(layout.TopContentHeight)
+		Height(panelHeight)
 
 	switch m.focus {
 	case FocusSidebar:
